@@ -1,0 +1,22 @@
+[project]
+name = "local-rag-system"
+version = "0.1.0"
+description = "Local RAG System - Phase 1: Source Collection with FastAPI and MS SQL Server"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.139.0",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.2",
+    "pyodbc>=5.3.0",
+    "python-dotenv>=1.2.2",
+    "sqlalchemy>=2.0.51",
+    "uvicorn[standard]>=0.50.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = false
