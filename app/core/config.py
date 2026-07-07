@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     DB_TRUSTED_CONNECTION: str = "yes"
     DB_USERNAME: str = ""
     DB_PASSWORD: str = ""
+    # CORS settings — comma-separated list of allowed frontend origins.
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     # Tells pydantic-settings to read from the .env file
     model_config = SettingsConfigDict(
@@ -65,7 +67,15 @@ class Settings(BaseSettings):
             f"mssql+pyodbc://{self.DB_USERNAME}:{self.DB_PASSWORD}"
             f"@{self.DB_SERVER}/{self.DB_NAME}?driver={driver}"
         )
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """
+        Parse the comma-separated CORS_ORIGINS string into a list.
 
+        Returns:
+            list[str]: The list of allowed origins, stripped of whitespace.
+        """
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
 @lru_cache
 def get_settings() -> Settings:
