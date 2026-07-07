@@ -14,6 +14,8 @@ colorama==0.4.6
     # via
     #   click
     #   uvicorn
+et-xmlfile==2.0.0
+    # via openpyxl
 fastapi==0.139.0
     # via local-rag-system (pyproject.toml)
 greenlet==3.5.3
@@ -24,6 +26,8 @@ httptools==0.8.0
     # via uvicorn
 idna==3.18
     # via anyio
+openpyxl==3.1.5
+    # via local-rag-system (pyproject.toml)
 pydantic==2.13.4
     # via
     #   local-rag-system (pyproject.toml)

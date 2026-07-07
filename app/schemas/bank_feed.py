@@ -38,3 +38,9 @@ class BankFeedResponse(BankFeedBase):
     id: int
 
     model_config = ConfigDict(from_attributes=True)
+    
+class BankFeedBulkResult(BaseModel):
+    """Response summary for a bulk or file-upload insert operation."""
+
+    inserted_count: int
+    message: str

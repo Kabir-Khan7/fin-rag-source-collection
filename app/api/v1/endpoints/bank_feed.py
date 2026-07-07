@@ -16,6 +16,11 @@ from app.schemas.bank_feed import (
     BankFeedUpdate,
 )
 from app.services.bank_feed_service import BankFeedService
+from fastapi import File, UploadFile
+from pydantic import ValidationError
+
+from app.schemas.bank_feed import BankFeedBulkResult
+from app.utils.file_parser import FileParseError
 
 router = APIRouter(prefix="/bank-feed", tags=["Bank Feed"])
 
@@ -107,3 +112,58 @@ def delete_bank_feed(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Bank feed record with id {record_id} not found",
         )
+        
+@router.post(
+    "/bulk",
+    response_model=BankFeedBulkResult,
+    status_code=status.HTTP_201_CREATED,
+    summary="Bulk-create bank feed records from a JSON array",
+)
+def bulk_create_bank_feeds(
+    payload: list[BankFeedCreate],
+    db: Session = Depends(get_db),
+) -> BankFeedBulkResult:
+    """Insert multiple bank feed records from a JSON array (all-or-nothing)."""
+    service = BankFeedService(db)
+    count = service.bulk_create(payload)
+    return BankFeedBulkResult(
+        inserted_count=count,
+        message=f"Successfully inserted {count} records.",
+    )
+
+
+@router.post(
+    "/upload",
+    response_model=BankFeedBulkResult,
+    status_code=status.HTTP_201_CREATED,
+    summary="Bulk-create bank feed records from an uploaded .xlsx or .csv file",
+)
+async def upload_bank_feeds(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> BankFeedBulkResult:
+    """
+    Upload an Excel or CSV file and insert all rows (all-or-nothing).
+
+    The file's header row must exactly match the table's column names.
+    """
+    content = await file.read()
+
+    service = BankFeedService(db)
+    try:
+        count = service.create_from_file(file.filename, content)
+    except FileParseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.errors(),
+        )
+
+    return BankFeedBulkResult(
+        inserted_count=count,
+        message=f"Successfully inserted {count} records from {file.filename}.",
+    )

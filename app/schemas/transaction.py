@@ -64,3 +64,9 @@ class TransactionResponse(TransactionBase):
 
     # Allows Pydantic to read data directly from ORM objects (not just dicts).
     model_config = ConfigDict(from_attributes=True)
+    
+class TransactionBulkResult(BaseModel):
+    """Response summary for a bulk or file-upload insert operation."""
+
+    inserted_count: int
+    message: str

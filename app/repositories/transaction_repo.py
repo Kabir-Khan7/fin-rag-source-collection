@@ -61,3 +61,21 @@ class TransactionRepository:
         self.db.delete(obj)
         self.db.commit()
         return True
+    
+    def bulk_create(self, data_list: list[dict]) -> int:
+        """
+        Insert multiple records in a single database transaction.
+
+        All rows are added and committed together. If the commit fails,
+        the entire batch is rolled back (all-or-nothing at the DB level).
+
+        Args:
+            data_list: A list of dictionaries, one per record.
+
+        Returns:
+            int: The number of records inserted.
+        """
+        objects = [Transaction(**data) for data in data_list]
+        self.db.add_all(objects)
+        self.db.commit()
+        return len(objects)

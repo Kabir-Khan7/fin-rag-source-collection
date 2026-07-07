@@ -59,3 +59,21 @@ class BankFeedRepository:
         self.db.delete(obj)
         self.db.commit()
         return True
+    
+    def bulk_create(self, data_list: list[dict]) -> int:
+        """
+        Insert multiple bank feed records in a single database transaction.
+
+        All rows are committed together; a failure rolls back the entire
+        batch (all-or-nothing at the DB level).
+
+        Args:
+            data_list: A list of dictionaries, one per record.
+
+        Returns:
+            int: The number of records inserted.
+        """
+        objects = [BankFeed(**data) for data in data_list]
+        self.db.add_all(objects)
+        self.db.commit()
+        return len(objects)

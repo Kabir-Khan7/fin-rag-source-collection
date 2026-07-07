@@ -17,6 +17,12 @@ from app.schemas.transaction import (
     TransactionUpdate,
 )
 from app.services.transaction_service import TransactionService
+from fastapi import File, UploadFile
+from pydantic import ValidationError
+
+from app.schemas.transaction import TransactionBulkResult
+from app.utils.file_parser import FileParseError
+
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
@@ -116,3 +122,60 @@ def delete_transaction(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Transaction with id {transaction_id} not found",
         )
+        
+        
+@router.post(
+    "/bulk",
+    response_model=TransactionBulkResult,
+    status_code=status.HTTP_201_CREATED,
+    summary="Bulk-create transactions from a JSON array",
+)
+def bulk_create_transactions(
+    payload: list[TransactionCreate],
+    db: Session = Depends(get_db),
+) -> TransactionBulkResult:
+    """Insert multiple transaction records from a JSON array (all-or-nothing)."""
+    service = TransactionService(db)
+    count = service.bulk_create(payload)
+    return TransactionBulkResult(
+        inserted_count=count,
+        message=f"Successfully inserted {count} records.",
+    )
+
+
+@router.post(
+    "/upload",
+    response_model=TransactionBulkResult,
+    status_code=status.HTTP_201_CREATED,
+    summary="Bulk-create transactions from an uploaded .xlsx or .csv file",
+)
+async def upload_transactions(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> TransactionBulkResult:
+    """
+    Upload an Excel or CSV file and insert all rows (all-or-nothing).
+
+    The file's header row must exactly match the table's column names.
+    If any row is invalid, the entire file is rejected.
+    """
+    content = await file.read()
+
+    service = TransactionService(db)
+    try:
+        count = service.create_from_file(file.filename, content)
+    except FileParseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.errors(),
+        )
+
+    return TransactionBulkResult(
+        inserted_count=count,
+        message=f"Successfully inserted {count} records from {file.filename}.",
+    )
