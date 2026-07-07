@@ -4,110 +4,78 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
-import type { SubledgerCreate, SubledgerResponse } from "@/types/subledger";
+import type { RawInvoiceCreate, RawInvoiceResponse } from "@/types/raw_invoices";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 
 const FIELDS = [
-  "Transaction_ID",
-  "System_Timestamp",
-  "Document_Date",
-  "GL_Account_Code",
-  "Entity_ID",
-  "Amount",
-  "Transaction_Type",
-  "Status",
-  "Description",
+  "Vendor_ID",
+  "Vendor_Name",
+  "Invoice_Number",
+  "Invoice_Date",
+  "Line_Item_Description",
+  "Line_Item_Quantity",
+  "Line_Item_Unit_Price",
+  "Total_Tax",
+  "Grand_Total",
+  "Raw_Text",
 ] as const;
 
 type FieldName = (typeof FIELDS)[number];
 type FormState = Record<FieldName, string>;
 
 const EMPTY_FORM: FormState = FIELDS.reduce(
-  (acc, field) => ({ ...acc, [field]: "" }),
-  {} as FormState
+  (acc, f) => ({ ...acc, [f]: "" }), {} as FormState
 );
 
-// Helper: is a string a valid number (allows decimals, negatives, commas)?
 function isNumeric(value: string): boolean {
   if (value.trim() === "") return false;
   return !isNaN(Number(value.replace(/,/g, "")));
 }
 
-export default function SubledgerPage() {
+export default function RawInvoicesPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
-  const [records, setRecords] = useState<SubledgerResponse[]>([]);
+  const [records, setRecords] = useState<RawInvoiceResponse[]>([]);
   const [loading, setLoading] = useState(false);
 
   async function loadRecords() {
     try {
-      const data = await apiGet<SubledgerResponse[]>(
-        "/api/v1/transactions?skip=0&limit=25"
-      );
+      const data = await apiGet<RawInvoiceResponse[]>("/api/v1/raw-invoices?skip=0&limit=25");
       setRecords(data);
     } catch (err) {
       toast.error(`Failed to load records: ${(err as Error).message}`);
     }
   }
 
-  useEffect(() => {
-    loadRecords();
-  }, []);
+  useEffect(() => { loadRecords(); }, []);
 
   function handleChange(field: FieldName, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
-    // Clear a field's error as the user edits it.
     setErrors((prev) => ({ ...prev, [field]: undefined }));
   }
 
-  // Validate the form. Returns true if valid; sets error messages if not.
   function validate(): boolean {
-    const newErrors: Partial<Record<FieldName, string>> = {};
-
-    // Transaction_ID required
-    if (form.Transaction_ID.trim() === "") {
-      newErrors.Transaction_ID = "Transaction_ID is required";
-    }
-
-    // Amount required + numeric
-    if (form.Amount.trim() === "") {
-      newErrors.Amount = "Amount is required";
-    } else if (!isNumeric(form.Amount)) {
-      newErrors.Amount = "Amount must be a valid number";
-    }
-
-    // GL_Account_Code: if provided, must be numeric
-    if (form.GL_Account_Code.trim() !== "" && !isNumeric(form.GL_Account_Code)) {
-      newErrors.GL_Account_Code = "GL_Account_Code must be numeric";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const e: Partial<Record<FieldName, string>> = {};
+    if (form.Invoice_Number.trim() === "") e.Invoice_Number = "Invoice_Number is required";
+    if (form.Grand_Total.trim() !== "" && !isNumeric(form.Grand_Total))
+      e.Grand_Total = "Grand_Total must be numeric";
+    if (form.Total_Tax.trim() !== "" && !isNumeric(form.Total_Tax))
+      e.Total_Tax = "Total_Tax must be numeric";
+    setErrors(e);
+    return Object.keys(e).length === 0;
   }
 
   async function handleSubmit() {
-    if (!validate()) {
-      toast.error("Please fix the highlighted fields");
-      return;
-    }
-
+    if (!validate()) { toast.error("Please fix the highlighted fields"); return; }
     setLoading(true);
     try {
-      await apiPost<SubledgerResponse>(
-        "/api/v1/transactions",
-        form as SubledgerCreate
-      );
+      await apiPost<RawInvoiceResponse>("/api/v1/raw-invoices", form as RawInvoiceCreate);
       toast.success("Record created successfully");
       setForm(EMPTY_FORM);
       setErrors({});
@@ -121,7 +89,7 @@ export default function SubledgerPage() {
 
   async function handleDelete(id: number) {
     try {
-      await apiDelete(`/api/v1/transactions/${id}`);
+      await apiDelete(`/api/v1/raw-invoices/${id}`);
       toast.success(`Deleted record ${id}`);
       await loadRecords();
     } catch (err) {
@@ -131,10 +99,9 @@ export default function SubledgerPage() {
 
   return (
     <main className="max-w-5xl mx-auto p-8 space-y-8">
-      <h1 className="text-2xl font-bold">Subledger — Data Entry</h1>
-
+      <h1 className="text-2xl font-bold">Raw Invoices — Data Entry</h1>
       <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">New Transaction</h2>
+        <h2 className="text-lg font-semibold mb-4">New Invoice</h2>
         <div className="grid grid-cols-2 gap-4">
           {FIELDS.map((field) => (
             <div key={field} className="space-y-1">
@@ -146,9 +113,7 @@ export default function SubledgerPage() {
                 placeholder={field}
                 className={errors[field] ? "border-red-500" : ""}
               />
-              {errors[field] && (
-                <p className="text-sm text-red-500">{errors[field]}</p>
-              )}
+              {errors[field] && <p className="text-sm text-red-500">{errors[field]}</p>}
             </div>
           ))}
         </div>
@@ -158,20 +123,17 @@ export default function SubledgerPage() {
           </Button>
         </div>
       </Card>
-
       <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">
-          Recent Records ({records.length})
-        </h2>
+        <h2 className="text-lg font-semibold mb-4">Recent Records ({records.length})</h2>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>ID</TableHead>
-                <TableHead>Transaction_ID</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Description</TableHead>
+                <TableHead>Invoice_Number</TableHead>
+                <TableHead>Vendor_Name</TableHead>
+                <TableHead>Grand_Total</TableHead>
+                <TableHead>Invoice_Date</TableHead>
                 <TableHead>Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -179,20 +141,12 @@ export default function SubledgerPage() {
               {records.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell>{r.id}</TableCell>
-                  <TableCell className="max-w-[180px] truncate">
-                    {r.Transaction_ID}
-                  </TableCell>
-                  <TableCell>{r.Amount}</TableCell>
-                  <TableCell>{r.Status}</TableCell>
-                  <TableCell className="max-w-[200px] truncate">
-                    {r.Description}
-                  </TableCell>
+                  <TableCell>{r.Invoice_Number}</TableCell>
+                  <TableCell className="max-w-[180px] truncate">{r.Vendor_Name}</TableCell>
+                  <TableCell>{r.Grand_Total}</TableCell>
+                  <TableCell>{r.Invoice_Date}</TableCell>
                   <TableCell>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDelete(r.id)}
-                    >
+                    <Button variant="destructive" size="sm" onClick={() => handleDelete(r.id)}>
                       Delete
                     </Button>
                   </TableCell>
