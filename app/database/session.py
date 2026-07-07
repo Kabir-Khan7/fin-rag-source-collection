@@ -37,3 +37,25 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+from sqlalchemy import text
+
+
+def check_database_connection() -> bool:
+    """
+    Verify that the database is reachable by executing a trivial query.
+
+    Runs 'SELECT 1' against the database. If it succeeds, the connection
+    is healthy. Used by the readiness health check.
+
+    Returns:
+        bool: True if the database responded successfully, False otherwise.
+    """
+    try:
+        db = SessionLocal()
+        try:
+            db.execute(text("SELECT 1"))
+            return True
+        finally:
+            db.close()
+    except Exception:
+        return False

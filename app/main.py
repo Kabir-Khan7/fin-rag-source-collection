@@ -5,6 +5,10 @@ Creates and configures the FastAPI application, sets up logging, CORS, and
 global exception handling, registers routes, and defines application-level
 endpoints.
 """
+from fastapi import status
+from fastapi.responses import JSONResponse
+
+from app.database.session import check_database_connection
 
 from contextlib import asynccontextmanager
 
@@ -66,5 +70,39 @@ app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/health", tags=["Health"])
 def health_check() -> dict[str, str]:
-    """Health check endpoint. Verifies the API server is running."""
+    """
+    Liveness check — confirms the API process is running.
+
+    Fast and dependency-free. Returns ok as long as the app is up.
+    """
     return {"status": "ok", "message": "Local RAG System is running"}
+
+
+@app.get("/health/ready", tags=["Health"])
+def readiness_check() -> JSONResponse:
+    """
+    Readiness check — confirms the API can serve requests.
+
+    Verifies database connectivity. Returns 200 if the database is
+    reachable, 503 if it is not. Monitoring tools use this to decide
+    whether the service should receive traffic.
+    """
+    db_healthy = check_database_connection()
+
+    if db_healthy:
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={
+                "status": "ready",
+                "database": "connected",
+            },
+        )
+
+    logger.error("Readiness check failed: database is unreachable")
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={
+            "status": "not_ready",
+            "database": "disconnected",
+        },
+    )
