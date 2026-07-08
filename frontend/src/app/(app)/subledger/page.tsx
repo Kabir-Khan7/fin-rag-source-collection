@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useActivity } from "@/context/ActivityContext";
 
-
-
+import { AppShell } from "@/components/AppShell";
 import { apiGet, apiPost, apiDelete } from "@/lib/api";
 import type { SubledgerCreate, SubledgerResponse } from "@/types/subledger";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,7 @@ export default function SubledgerPage() {
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [records, setRecords] = useState<SubledgerResponse[]>([]);
   const [loading, setLoading] = useState(false);
+  const { logActivity } = useActivity();
 
   async function loadRecords() {
     try {
@@ -112,11 +113,23 @@ export default function SubledgerPage() {
         form as SubledgerCreate
       );
       toast.success("Record created successfully");
+      logActivity({
+        action: "Delete",
+        resource: "Subledger",
+        status: "success",
+        detail: `Deleted record ${form.Transaction_ID}`,
+      });
       setForm(EMPTY_FORM);
       setErrors({});
       await loadRecords();
     } catch (err) {
       toast.error(`Failed to create: ${(err as Error).message}`);
+      logActivity({
+        action: "Create",
+        resource: "Subledger",
+        status: "error",
+        detail: (err as Error).message,
+      });
     } finally {
       setLoading(false);
     }
@@ -133,6 +146,7 @@ export default function SubledgerPage() {
   }
 
   return (
+    <AppShell>
     <main className="max-w-5xl mx-auto p-8 space-y-8">
       <h1 className="text-2xl font-bold">Subledger — Data Entry</h1>
 
@@ -216,5 +230,6 @@ export default function SubledgerPage() {
         </div>
       </Card>
     </main>
+    </AppShell>
   );
 }

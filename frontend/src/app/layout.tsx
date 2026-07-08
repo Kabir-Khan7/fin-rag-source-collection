@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/sonner";
+import { ActivityProvider } from "@/context/ActivityContext";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,8 +14,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {children}
-        <Toaster richColors position="top-right" />
+        <ActivityProvider>
+          {children}
+          <Toaster richColors position="top-right" />
+        </ActivityProvider>
       </body>
     </html>
   );
