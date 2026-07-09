@@ -19,10 +19,10 @@ logger = get_logger(__name__)
 # procedures (Milestone 5), they get appended here.
 TRANSFORM_STEPS: list[str] = [
     "dbo.usp_transform_subledger",
-    # "dbo.usp_transform_chart_of_accounts",
-    # "dbo.usp_transform_entities",
-    # "dbo.usp_transform_bank_feed",
-    # "dbo.usp_transform_invoices",
+    "dbo.usp_transform_chart_of_accounts",
+    "dbo.usp_transform_entities",
+    "dbo.usp_transform_bank_feed",
+    "dbo.usp_transform_invoices",
 ]
 
 
