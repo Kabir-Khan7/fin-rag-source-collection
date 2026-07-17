@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = ""
     # CORS settings — comma-separated list of allowed frontend origins.
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    # Qdrant vector database settings
+    QDRANT_HOST: str = "localhost"
+    QDRANT_PORT: int = 6333
+    QDRANT_COLLECTION: str = "financial_documents"
+
+    # Embedding model settings (config-driven — swap model + dim together)
+    EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
+    EMBEDDING_DIM: int = 384
 
     # Tells pydantic-settings to read from the .env file
     model_config = SettingsConfigDict(

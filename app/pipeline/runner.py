@@ -83,3 +83,48 @@ def run_transform(procedure_name: str) -> TransformResult:
         raise
     finally:
         db.close()
+        
+@dataclass
+class GoldBuildResult:
+    """Counts returned by a Gold metric-build stored procedure."""
+
+    metric_table: str
+    rows_built: int
+
+
+def run_gold_build(procedure_name: str) -> GoldBuildResult:
+    """
+    Execute a Gold metric-build stored procedure and return its count.
+
+    Gold procedures full-refresh their target table and return a single
+    row: (metric_table, rows_built).
+
+    Args:
+        procedure_name: e.g. 'dbo.usp_build_account_balances'.
+
+    Returns:
+        GoldBuildResult: The table name and number of rows built.
+    """
+    db = SessionLocal()
+    try:
+        logger.info("Running Gold build: %s", procedure_name)
+        result = db.execute(text(f"EXEC {procedure_name}"))
+        row = result.fetchone()
+        db.commit()
+
+        if row is None:
+            raise RuntimeError(f"{procedure_name} returned no result row.")
+
+        build_result = GoldBuildResult(
+            metric_table=row.metric_table,
+            rows_built=row.rows_built,
+        )
+        logger.info("%s complete — rows_built=%d", procedure_name, build_result.rows_built)
+        return build_result
+
+    except Exception as exc:
+        db.rollback()
+        logger.error("Gold build %s failed: %s", procedure_name, exc, exc_info=True)
+        raise
+    finally:
+        db.close()

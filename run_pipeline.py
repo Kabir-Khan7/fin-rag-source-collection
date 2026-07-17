@@ -33,6 +33,11 @@ def main() -> None:
         print(f"\n  Status: FAILED at {summary.failed_step}")
         print(f"  Error: {summary.error}")
     print("=" * 55)
+    
+    if summary.gold_results:
+        print("\n  GOLD METRICS BUILT:")
+        for g in summary.gold_results:
+            print(f"    {g.metric_table:<28} rows={g.rows_built}")
 
 
 if __name__ == "__main__":
