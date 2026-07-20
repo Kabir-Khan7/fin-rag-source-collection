@@ -8,6 +8,7 @@ to the agent or finish — with a hard iteration cap in code, not prompt.
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
+import sqlite3
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 from langchain_core.tools import tool
@@ -18,6 +19,22 @@ from app.agent.tools import sql_executor as _sql_executor
 from app.agent.tools import vector_retriever as _vector_retriever
 from app.agent.schema_context import GOLD_SCHEMA_DESCRIPTION
 from app.utils.logger import get_logger
+
+
+import re
+
+
+def strip_thinking(text: str) -> str:
+    """Remove Qwen3 <think>...</think> blocks from output text."""
+    if not text:
+        return text
+    # Remove complete <think>...</think> blocks.
+    cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    # Remove a dangling </think> (when the opening tag was suppressed but
+    # the closing tag and preamble still render, as in your output).
+    if "</think>" in cleaned:
+        cleaned = cleaned.split("</think>")[-1]
+    return cleaned.strip()
 
 logger = get_logger(__name__)
 
@@ -95,5 +112,9 @@ def build_finance_graph():
     graph.add_edge("tools", "agent")
 
     # SqliteSaver: local, survives restarts (working memory / HITL later).
-    checkpointer = SqliteSaver.from_conn_string("agent_memory.db")
+    # Build from a real connection (check_same_thread=False so it works
+    # across LangGraph's execution). from_conn_string returns a context
+    # manager, so we construct the saver directly instead.
+    conn = sqlite3.connect("agent_memory.db", check_same_thread=False)
+    checkpointer = SqliteSaver(conn)
     return graph.compile(checkpointer=checkpointer)

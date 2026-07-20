@@ -14,9 +14,8 @@ from app.core.config import settings
 def get_llm() -> ChatOllama:
     """Return the configured local chat model for agent nodes."""
     return ChatOllama(
-        model=settings.AGENT_MODEL,   # qwen3:4b
-        temperature=0,                # deterministic tool selection
-        # Disable Qwen3 "thinking" — on CPU it adds huge latency for
-        # no tool-calling benefit (research: ~63s/call with thinking on).
-        reasoning=False,
+        model=settings.AGENT_MODEL,
+        temperature=0,
+        # Disable Qwen3 thinking via Ollama's think parameter.
+        model_kwargs={"think": False},
     )

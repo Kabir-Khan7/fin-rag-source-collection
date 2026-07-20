@@ -1,7 +1,7 @@
 """Test the L0 LangGraph finance agent — should match the old ReAct loop."""
 
 from langchain_core.messages import HumanMessage
-from app.agent.graph.finance_graph import build_finance_graph
+from app.agent.graph.finance_graph import build_finance_graph, strip_thinking
 
 
 def main() -> None:
@@ -17,7 +17,8 @@ def main() -> None:
     )
 
     # The last message is the agent's final answer.
-    print(f"CFO: {result['messages'][-1].content}")
+    answer = strip_thinking(result["messages"][-1].content)
+    print(f"CFO: {answer}")
 
 
 if __name__ == "__main__":
