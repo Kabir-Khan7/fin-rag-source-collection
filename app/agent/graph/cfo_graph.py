@@ -9,7 +9,7 @@ the real org chart.
 """
 
 import sqlite3
-
+import re
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -41,26 +41,59 @@ def cfo_intake_node(state: AgentState) -> dict:
     return {}
 
 
+CFO_SYNTHESIS_PROMPT = """You are the AI CFO speaking directly to the business \
+owner. Below are the ONLY facts you may state, each with a placeholder token.
+
+RULES:
+- Refer to every figure ONLY by its {placeholder_token}. Never write a raw \
+number yourself — the system fills tokens with exact values.
+- Write in a clear, professional executive tone. No emojis. No filler \
+greetings. Lead with the answer.
+- If a figure you'd need has no token below, do not invent it — omit it.
+
+Available facts:
+{facts_block}
+
+Write the owner's answer using the placeholder tokens."""
+
+
 def cfo_synthesis_node(state: AgentState) -> dict:
-    """The one LLM call: compose the owner-facing answer from the findings."""
-    logger.info("AI CFO synthesizing final answer (single LLM call).")
+    logger.info("AI CFO — synthesizing (placeholder-injection mode).")
+    facts = state.get("facts", [])
 
-    escalations = state.get("escalations", [])
-    findings_text = "\n".join(escalations) if escalations else "No data available."
+    if not facts:
+        return {"messages": [AIMessage(content="I couldn't gather the data for that. Could you rephrase?")]}
 
-    question = ""
-    for m in state["messages"]:
-        if m.type == "human":
-            question = m.content
-            break
+    # Build the fact menu the LLM sees — tokens + human labels, NO trust in it to copy numbers.
+    facts_block = "\n".join(
+        f"  {{{f['label']}}} = {f['display']}  (from {f['source']['table']}.{f['source']['column']})"
+        for f in facts
+    )
 
     llm = get_llm()
-    response = llm.invoke([
-        SystemMessage(content=CFO_SYNTHESIS_PROMPT),
-        HumanMessage(content=f"Owner asked: {question}\n\nFigures:\n{findings_text}"),
+    prompt = CFO_SYNTHESIS_PROMPT.format(facts_block=facts_block)
+    raw = llm.invoke([
+        SystemMessage(content=prompt),
+        HumanMessage(content=state["messages"][-1].content),
     ])
-    answer = strip_thinking(response.content)
-    return {"final_answer": answer, "messages": [AIMessage(content=answer)]}
+    narrative = strip_thinking(raw.content)
+
+    # DETERMINISTIC INJECTION — Python owns every number.
+    lookup = {f["label"]: f["display"] for f in facts}
+    def _sub(m):
+        token = m.group(1)
+        if token not in lookup:
+            logger.warning("LLM referenced unknown token {%s} — left visible.", token)
+            return m.group(0)  # leave "{bad_token}" in text so it's caught, not silently wrong
+        return lookup[token]
+
+    answer = re.sub(r"\{(\w+)\}", _sub, narrative)
+
+    # Provenance footer — satisfies your architecture's source-attribution mandate.
+    sources = sorted({f"{f['source']['table']}.{f['source']['column']}" for f in facts})
+    answer += "\n\n— Sourced from: " + ", ".join(sources)
+
+    return {"messages": [AIMessage(content=answer)]}
 
 
 def build_cfo_graph():
