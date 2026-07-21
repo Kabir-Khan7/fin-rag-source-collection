@@ -8,9 +8,9 @@ questions ("how's my business?"), it runs ALL workers for a full picture.
 
 from app.agent.graph.state import AgentState
 from app.agent.graph.workers import (
-    cashflow_worker,
-    payables_worker,
-    vendor_spend_worker,
+    cashflow_worker_node,
+    payables_worker_node,
+    vendor_spend_worker_node,
 )
 from app.utils.logger import get_logger
 
@@ -31,10 +31,7 @@ OVERVIEW_KEYWORDS = ["how's my business", "how is my business", "overview",
 
 
 def finance_hod_node(state: AgentState) -> dict:
-    """
-    Finance HOD: routes the question to the right worker(s) by keyword,
-    collects their findings, and escalates them upward.
-    """
+    """Routes by keyword, collects structured facts from each relevant worker."""
     question = ""
     for m in state["messages"]:
         if m.type == "human":
@@ -44,24 +41,19 @@ def finance_hod_node(state: AgentState) -> dict:
     q = question.lower()
     logger.info("Finance HOD routing: %s", question[:60])
 
-    escalations = []
-
-    # Broad question → run everything for a full picture.
+    facts = []
     is_overview = any(k in q for k in OVERVIEW_KEYWORDS)
 
     if is_overview or any(k in q for k in CASHFLOW_KEYWORDS):
-        escalations.append(f"[Finance · Cash-Flow] {cashflow_worker(question)}")
-
+        facts += cashflow_worker_node(state).get("facts", [])
     if is_overview or any(k in q for k in PAYABLES_KEYWORDS):
-        escalations.append(f"[Finance · Payables] {payables_worker(question)}")
-
+        facts += payables_worker_node(state).get("facts", [])
     if is_overview or any(k in q for k in VENDOR_KEYWORDS):
-        escalations.append(f"[Finance · Vendor Spend] {vendor_spend_worker(question)}")
+        facts += vendor_spend_worker_node(state).get("facts", [])
 
-    # Fallback: if nothing matched, default to cash-flow (safe default).
-    if not escalations:
+    if not facts:
         logger.info("No keyword match — defaulting to Cash-Flow Worker.")
-        escalations.append(f"[Finance · Cash-Flow] {cashflow_worker(question)}")
+        facts += cashflow_worker_node(state).get("facts", [])
 
-    logger.info("Finance HOD gathered %d worker finding(s).", len(escalations))
-    return {"escalations": escalations}
+    logger.info("Finance HOD gathered %d fact(s).", len(facts))
+    return {"facts": facts}
